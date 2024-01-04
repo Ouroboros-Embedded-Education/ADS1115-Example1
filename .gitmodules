@@ -1,0 +1,3 @@
+[submodule "libs/ads1115"]
+	path = libs/ads1115
+	url = git@github.com:libdriver/ads1115.git
