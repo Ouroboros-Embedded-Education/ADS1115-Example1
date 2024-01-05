@@ -49,6 +49,7 @@ int16_t A0Raw;
 float A0Value;
 /* USER CODE END PV */
 
+
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
