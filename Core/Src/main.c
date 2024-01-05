@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "driver_ads1115.h"
+#include "driver_ads1115_interface.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,7 +44,9 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-
+ads1115_handle_t Ads1115;
+int16_t A0Raw;
+float A0Value;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -56,7 +59,23 @@ static void MX_I2C1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void _init_ads1115(ads1115_handle_t *Handle){
+	DRIVER_ADS1115_LINK_INIT(Handle, ads1115_handle_t);
+	DRIVER_ADS1115_LINK_IIC_INIT(Handle, ads1115_interface_iic_init);
+	DRIVER_ADS1115_LINK_IIC_DEINIT(Handle, ads1115_interface_iic_deinit);
+    DRIVER_ADS1115_LINK_IIC_READ(Handle, ads1115_interface_iic_read);
+    DRIVER_ADS1115_LINK_IIC_WRITE(Handle, ads1115_interface_iic_write);
+    DRIVER_ADS1115_LINK_DELAY_MS(Handle, ads1115_interface_delay_ms);
+    DRIVER_ADS1115_LINK_DEBUG_PRINT(Handle, ads1115_interface_debug_print);
 
+    ads1115_set_addr_pin(Handle, ADS1115_ADDR_GND);
+    ads1115_init(Handle);
+    ads1115_set_channel(Handle, ADS1115_CHANNEL_AIN0_GND);
+    ads1115_set_range(Handle, ADS1115_RANGE_4P096V);
+    ads1115_set_rate(Handle, ADS1115_RATE_860SPS);
+    ads1115_set_compare(Handle, ADS1115_BOOL_FALSE);
+    ads1115_start_continuous_read(Handle);
+}
 /* USER CODE END 0 */
 
 /**
@@ -89,13 +108,15 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-
+  _init_ads1115(&Ads1115);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  ads1115_continuous_read(&Ads1115, &A0Raw, &A0Value);
+	  HAL_Delay(15);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
