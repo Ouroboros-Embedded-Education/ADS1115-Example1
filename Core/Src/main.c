@@ -27,7 +27,12 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef enum{
+	ADC_A0,
+	ADC_A1,
+	ADC_A2,
+	ADC_A3
+}ADC_Channel_it_e;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -45,8 +50,9 @@ I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
 ads1115_handle_t Ads1115;
-int16_t A0Raw;
-float A0Value;
+int16_t ARaw[4];
+float AValue[4];
+ADC_Channel_it_e AdcAx = ADC_A0;
 /* USER CODE END PV */
 
 
@@ -76,6 +82,32 @@ void _init_ads1115(ads1115_handle_t *Handle){
     ads1115_set_rate(Handle, ADS1115_RATE_860SPS);
     ads1115_set_compare(Handle, ADS1115_BOOL_FALSE);
     ads1115_start_continuous_read(Handle);
+}
+
+void _readChannel(){
+	switch(AdcAx){
+	case ADC_A0:
+		ads1115_continuous_read(&Ads1115, &ARaw[0], &AValue[0]);
+		AdcAx = ADC_A1;
+		ads1115_set_channel(&Ads1115, ADS1115_CHANNEL_AIN1_GND);
+		break;
+	case ADC_A1:
+		ads1115_continuous_read(&Ads1115, &ARaw[1], &AValue[1]);
+		AdcAx = ADC_A2;
+		ads1115_set_channel(&Ads1115, ADS1115_CHANNEL_AIN2_GND);
+		break;
+	case ADC_A2:
+		ads1115_continuous_read(&Ads1115, &ARaw[2], &AValue[2]);
+		AdcAx = ADC_A3;
+		ads1115_set_channel(&Ads1115, ADS1115_CHANNEL_AIN3_GND);
+		break;
+	case ADC_A3:
+		ads1115_continuous_read(&Ads1115, &ARaw[3], &AValue[3]);
+		AdcAx = ADC_A0;
+		ads1115_set_channel(&Ads1115, ADS1115_CHANNEL_AIN0_GND);
+		break;
+	}
+	ads1115_start_continuous_read(&Ads1115);
 }
 /* USER CODE END 0 */
 
@@ -116,7 +148,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  ads1115_continuous_read(&Ads1115, &A0Raw, &A0Value);
+	  _readChannel();
 	  HAL_Delay(15);
     /* USER CODE END WHILE */
 
