@@ -60,20 +60,35 @@ static void MX_I2C1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 void _init_ads1115(ads1115_handle_t *Handle){
+	/* Inicializa o Handle do ADS115 e atribui as funcoes */
 	DRIVER_ADS1115_LINK_INIT(Handle, ads1115_handle_t);
+	// Funcao de inicializacao da I2C
 	DRIVER_ADS1115_LINK_IIC_INIT(Handle, ads1115_interface_iic_init);
+	// Funcao de deinicializacao do I2C
 	DRIVER_ADS1115_LINK_IIC_DEINIT(Handle, ads1115_interface_iic_deinit);
+	// Funcao para leitura de registradores do ADS1115
     DRIVER_ADS1115_LINK_IIC_READ(Handle, ads1115_interface_iic_read);
+    // Funcao para escrever em registradores do ADS1115
     DRIVER_ADS1115_LINK_IIC_WRITE(Handle, ads1115_interface_iic_write);
+    // Funcao de Delay, em millisegundos
     DRIVER_ADS1115_LINK_DELAY_MS(Handle, ads1115_interface_delay_ms);
+    // Funcao para geracao de Logs do driver
     DRIVER_ADS1115_LINK_DEBUG_PRINT(Handle, ads1115_interface_debug_print);
 
+    /* Configura o driver do ADS1115 */
+    // Atribui o Endereço de acordo com o sinal no terminal de ADDR, neste caso, GND
     ads1115_set_addr_pin(Handle, ADS1115_ADDR_GND);
+    // Iniciliza o chip do ADS1115
     ads1115_init(Handle);
+    // Define o canal do MUX para AIN0 como V+ e GND como V- (Vin = AIN0-GND)
     ads1115_set_channel(Handle, ADS1115_CHANNEL_AIN0_GND);
+    // Define o range do PGA para a tensao de +-4.096V
     ads1115_set_range(Handle, ADS1115_RANGE_4P096V);
+    // Define a velocidade de leitura máxima, de 860 Samples per Second
     ads1115_set_rate(Handle, ADS1115_RATE_860SPS);
+    // Desabilita o comparador
     ads1115_set_compare(Handle, ADS1115_BOOL_FALSE);
+    // Inicia a conversao continua do ADS1115
     ads1115_start_continuous_read(Handle);
 }
 /* USER CODE END 0 */
@@ -115,6 +130,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  // realiza a leitura do registrador de conversao
 	  ads1115_continuous_read(&Ads1115, &A0Raw, &A0Value);
 	  HAL_Delay(15);
     /* USER CODE END WHILE */
