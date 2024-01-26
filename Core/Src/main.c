@@ -21,18 +21,20 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stddef.h>
+
 #include "driver_ads1115.h"
 #include "driver_ads1115_interface.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef enum{
-	ADC_A0,
-	ADC_A1,
-	ADC_A2,
-	ADC_A3
-}ADC_Channel_it_e;
+typedef struct{
+	int16_t Raw;
+	float Value;
+	uint8_t Rdy;
+	uint16_t SPS;
+}Alrt_ADS_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -50,11 +52,9 @@ I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
 ads1115_handle_t Ads1115;
-int16_t ARaw[4];
-float AValue[4];
-ADC_Channel_it_e AdcAx = ADC_A0;
+uint16_t Alrt_Rdy_Cnt;
+Alrt_ADS_t AlrtData;
 /* USER CODE END PV */
-
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -66,7 +66,22 @@ static void MX_I2C1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void _init_ads1115(ads1115_handle_t *Handle){
+
+/*
+ * Callbacks
+ */
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+	if (GPIO_Pin == ADS1115_ALRT_Pin){
+		AlrtData.Rdy = 1;
+		Alrt_Rdy_Cnt++;
+	}
+}
+
+/*
+ * Initialize
+ */
+void _init_ads1115(ads1115_handle_t *Handle, uint8_t isRdy){
 	/* Inicializa o Handle do ADS115 e atribui as funcoes */
 	DRIVER_ADS1115_LINK_INIT(Handle, ads1115_handle_t);
 	// Funcao de inicializacao da I2C
@@ -82,57 +97,57 @@ void _init_ads1115(ads1115_handle_t *Handle){
     // Funcao para geracao de Logs do driver
     DRIVER_ADS1115_LINK_DEBUG_PRINT(Handle, ads1115_interface_debug_print);
 
-    /* Configura o driver do ADS1115 */
-    // Atribui o Endereço de acordo com o sinal no terminal de ADDR, neste caso, GND
-    ads1115_set_addr_pin(Handle, ADS1115_ADDR_GND);
-    // Iniciliza o chip do ADS1115
-    ads1115_init(Handle);
-    // Define o canal do MUX para AIN0 como V+ e GND como V- (Vin = AIN0-GND)
-    ads1115_set_channel(Handle, ADS1115_CHANNEL_AIN0_GND);
-    // Define o range do PGA para a tensao de +-4.096V
-    ads1115_set_range(Handle, ADS1115_RANGE_4P096V);
-    // Define a velocidade de leitura máxima, de 860 Samples per Second
-    ads1115_set_rate(Handle, ADS1115_RATE_860SPS);
-    // Desabilita o comparador
-    ads1115_set_compare(Handle, ADS1115_BOOL_FALSE);
-    // Inicia a conversao continua do ADS1115
-    ads1115_start_continuous_read(Handle);
+    /* Configura o driver do ADS1115 em Modo Alert ou Ready */
+
+    // Alert Mode
+    if (isRdy == 0){
+    	int16_t HighT, LowT;
+        // Atribui o Endereço de acordo com o sinal no terminal de ADDR, neste caso, GND
+        ads1115_set_addr_pin(Handle, ADS1115_ADDR_GND);
+        // Iniciliza o chip do ADS1115
+        ads1115_init(Handle);
+        // Define o canal do MUX para AIN0 como V+ e GND como V- (Vin = AIN0-GND)
+        ads1115_set_channel(Handle, ADS1115_CHANNEL_AIN0_GND);
+        // Define o range do PGA para a tensao de +-4.096V
+        ads1115_set_range(Handle, ADS1115_RANGE_4P096V);
+        // Define a velocidade de leitura máxima, de 860 Samples per Second
+        ads1115_set_rate(Handle, ADS1115_RATE_860SPS);
+
+        ads1115_set_compare_mode(Handle, ADS1115_COMPARE_WINDOW);
+        ads1115_set_comparator_queue(Handle, ADS1115_COMPARATOR_QUEUE_4_CONV);
+
+        ads1115_convert_to_register(Handle, 1.5, &LowT);
+        ads1115_convert_to_register(Handle, 1.8, &HighT);
+        ads1115_set_compare_threshold(Handle, HighT, LowT);
+        // Desabilita o comparador
+        ads1115_set_compare(Handle, ADS1115_BOOL_TRUE);
+
+        // Inicia a conversao continua do ADS1115
+        ads1115_start_continuous_read(Handle);
+    }
+    // Ready Mode
+    else{
+        // Atribui o Endereço de acordo com o sinal no terminal de ADDR, neste caso, GND
+        ads1115_set_addr_pin(Handle, ADS1115_ADDR_GND);
+        // Iniciliza o chip do ADS1115
+        ads1115_init(Handle);
+        // Define o canal do MUX para AIN0 como V+ e GND como V- (Vin = AIN0-GND)
+        ads1115_set_channel(Handle, ADS1115_CHANNEL_AIN0_GND);
+        // Define o range do PGA para a tensao de +-4.096V
+        ads1115_set_range(Handle, ADS1115_RANGE_4P096V);
+        // Define a velocidade de leitura máxima, de 860 Samples per Second
+        ads1115_set_rate(Handle, ADS1115_RATE_860SPS);
+
+        ads1115_set_comparator_queue(Handle, ADS1115_COMPARATOR_QUEUE_1_CONV);
+        ads1115_set_compare_threshold(Handle, 0x8000, 0x7FFF);
+        // Desabilita o comparador
+        ads1115_set_compare(Handle, ADS1115_BOOL_TRUE);
+
+        // Inicia a conversao continua do ADS1115
+        ads1115_start_continuous_read(Handle);
+    }
 }
 
-void _readChannel(){
-	switch(AdcAx){
-	case ADC_A0:
-		// Le o registrador de conversao do canal AIN0
-		ads1115_continuous_read(&Ads1115, &ARaw[0], &AValue[0]);
-		// configura o canal AIN1
-		AdcAx = ADC_A1;
-		ads1115_set_channel(&Ads1115, ADS1115_CHANNEL_AIN1_GND);
-		break;
-	case ADC_A1:
-		// Le o registrador de conversao do canal AIN1
-		ads1115_continuous_read(&Ads1115, &ARaw[1], &AValue[1]);
-		// Configura o canal AIN2
-		AdcAx = ADC_A2;
-		ads1115_set_channel(&Ads1115, ADS1115_CHANNEL_AIN2_GND);
-		break;
-	case ADC_A2:
-		// Le o registrador de conversao do canal AIN2
-		ads1115_continuous_read(&Ads1115, &ARaw[2], &AValue[2]);
-		// Configura o canal AIN3
-		AdcAx = ADC_A3;
-		ads1115_set_channel(&Ads1115, ADS1115_CHANNEL_AIN3_GND);
-		break;
-	case ADC_A3:
-		// Le o registrador de conversao do canal AIN3
-		ads1115_continuous_read(&Ads1115, &ARaw[3], &AValue[3]);
-		// Configura o canal AIN0
-		AdcAx = ADC_A0;
-		ads1115_set_channel(&Ads1115, ADS1115_CHANNEL_AIN0_GND);
-		break;
-	}
-	// reseta a leitura continua do ADS1115
-	ads1115_start_continuous_read(&Ads1115);
-}
 /* USER CODE END 0 */
 
 /**
@@ -142,7 +157,7 @@ void _readChannel(){
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	uint32_t Tick1000;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -165,15 +180,25 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  _init_ads1115(&Ads1115);
+  _init_ads1115(&Ads1115, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  Tick1000 = HAL_GetTick();
+  AlrtData.Rdy = 0;
+  AlrtData.SPS = 0;
   while (1)
   {
-	  _readChannel();
-	  HAL_Delay(15);
+	  if (AlrtData.Rdy == 1){
+		  AlrtData.Rdy = 0;
+		  ads1115_continuous_read(&Ads1115, &AlrtData.Raw, &AlrtData.Value);
+	  }
+	  if ((HAL_GetTick() - Tick1000) >= 1000){
+		  Tick1000 = HAL_GetTick();
+		  AlrtData.SPS = Alrt_Rdy_Cnt;
+		  Alrt_Rdy_Cnt = 0;
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -272,9 +297,13 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : ADS1115_ALRT_Pin */
   GPIO_InitStruct.Pin = ADS1115_ALRT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(ADS1115_ALRT_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
